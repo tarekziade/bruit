@@ -120,7 +120,8 @@ for c, task in enumerate(data["run.name"]):
             "with_13": np.median(samples[:13]),
             "with_20": np.median(samples[:20]),
             "progressive": _progressive(samples),
-            "ts": ts
+            "ts": ts,
+            "samples": samples
         }
     )
 
@@ -131,7 +132,8 @@ def diff(orig, new):
 
 avg = {"8": [], "13": [], "20": [], "prog": []}
 
-print("name,when,25,20,20_diff,13,13_diff,8,8_diff,prog,prog_diff,prog_samples,prog_perms")
+rn = ",".join([str(i) for i in range(25)])
+print("name,when,25,20,20_diff,13,13_diff,8,8_diff,prog,prog_diff,prog_samples,prog_perms,"+rn)
 for name, values in res.items():
     #print(name)
     for value in values:
@@ -154,10 +156,9 @@ for name, values in res.items():
         with_8 = value["with_8"]
         with_8_diff = diff(orig, with_8)
         with_20_diff = diff(orig, with_20)
-        print(
-            m
-            % (
-                name,value["ts"],
+        m =  m % (
+                name,
+                value["ts"],
                 orig,
                 with_20,
                 with_20_diff,
@@ -170,11 +171,13 @@ for name, values in res.items():
                 samp,
                 perm,
             )
-        )
-        avg["8"].append(with_8_diff)
-        avg["13"].append(with_13_diff)
-        avg["20"].append(with_20_diff)
-        avg["prog"].append(prog_diff)
+        m += "," + ",".join([str(v) for v in value["samples"]])
+
+        #avg["8"].append(with_8_diff)
+        #avg["13"].append(with_13_diff)
+        #avg["20"].append(with_20_diff)
+        #avg["prog"].append(prog_diff)
+        print(m)
 
 #print("8 samples average diff %.2f%%" % np.average(avg["8"]))
 #print("13 samples average diff %.2f%%" % np.average(avg["13"]))
