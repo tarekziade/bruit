@@ -4,6 +4,7 @@ import urllib
 import pathlib
 import hashlib
 from collections import defaultdict
+import random
 
 import numpy as np
 from urllib.parse import urlencode
@@ -80,9 +81,10 @@ def query_activedata(query_json):
 # Set the number of data points to look at
 AD_QUERY["limit"] = 10000
 data = query_activedata(AD_QUERY)
+failed = 0
 
-
-def _progressive(samples, threshold=2):
+def _progressive(samples, threshold=2.8):
+    global failed
     # starts with 9
     data = samples[:9]
     i = 8
@@ -100,9 +102,12 @@ def _progressive(samples, threshold=2):
             data.append(samples[i])
             perm += 1
             i += 1
+    failed += 1
     return np.median(samples), i, perm
 
-
+size = 25
+dump = 2
+tot = size - dump
 res = defaultdict(list)
 for c, task in enumerate(data["run.name"]):
     ts = data["run.timestamp"][c]
@@ -111,8 +116,13 @@ for c, task in enumerate(data["run.name"]):
     if not samples or not isinstance(samples, list):
         # Some tests are missing these
         continue
-    if len(samples) < 25:
+    if len(samples) < size:
         continue
+
+    # removing the first one
+    samples = samples[dump:]
+    random.shuffle(samples)
+
     res[task].append(
         {
             "original": np.median(samples),
@@ -130,10 +140,12 @@ def diff(orig, new):
     return (new - orig) / orig * 100
 
 
+occ  = defaultdict(int)
 avg = {"8": [], "13": [], "20": [], "prog": []}
-
-rn = ",".join([str(i) for i in range(25)])
-print("name,when,25,20,20_diff,13,13_diff,8,8_diff,prog,prog_diff,prog_samples,prog_perms,"+rn)
+big = 0
+total = 0
+rn = ",".join([str(i) for i in range(tot)])
+print("name,when,24,20,20_diff,13,13_diff,8,8_diff,prog,prog_diff,prog_samples,prog_perms,"+rn)
 for name, values in res.items():
     #print(name)
     for value in values:
@@ -152,6 +164,9 @@ for name, values in res.items():
         with_13 = value["with_13"]
         with_13_diff = diff(orig, with_13)
         prog_diff = diff(orig, prog)
+        if with_13_diff > 10:
+            big += 1
+        total += 1
         with_20 = value["with_20"]
         with_8 = value["with_8"]
         with_8_diff = diff(orig, with_8)
@@ -177,9 +192,17 @@ for name, values in res.items():
         #avg["13"].append(with_13_diff)
         #avg["20"].append(with_20_diff)
         #avg["prog"].append(prog_diff)
-        print(m)
+        if name == "test-macosx1014-64-shippable/opt-raptor-tp6-9-firefox-cold-e10s":
+            print(m)
+        occ[name] += 1
 
 #print("8 samples average diff %.2f%%" % np.average(avg["8"]))
 #print("13 samples average diff %.2f%%" % np.average(avg["13"]))
 #print("20 samples average diff %.2f%%" % np.average(avg["20"]))
 #print("progressive samples diff %.2f%%" % np.average(avg["prog"]))
+#print("Failed " + str(failed))
+#print("Too big " + str(big))
+#print("Total " + str(total))
+
+#print(sorted([(num, n) for n, num in occ.items()]))
+
