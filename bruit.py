@@ -20,26 +20,31 @@ If you want data from a certain period use:
 """
 AD_QUERY = {
     "from": "perf",
+    "limit": 1,
+    "select": [
+        "run.name",
+        "run.timestamp",
+        "result.suite",
+        "result.test",
+        "result.samples",
+        "result.stats",
+    ],
     "where": {
         "and": [
+            {"gte": {"action.start_time": {"date": "today-3month"}}},
+            {"lt": {"action.start_time": {"date": "today"}}},
             {
                 "or": [
                     {"find": {"run.name": "raptor"}},
                     {"find": {"run.name": "browsertime"}},
                 ]
             },
-            {"or": [{"find": {"run.name": "tp6-"}}, {"find": {"run.name": "tp6m-"}}]},
+            {"or": [{"find": {"run.name": "tp6-"}},
+                    {"find": {"run.name": "tp6m-"}}
+                ]},
             {"eq": {"task.state": "completed"}},
         ]
     },
-    "select": [
-        "run.name",
-        "result.suite",
-        "result.test",
-        "result.samples",
-        "result.stats",
-    ],
-    "limit": 1,
 }
 
 
@@ -99,11 +104,11 @@ def _progressive(samples, threshold=2):
 
 
 res = defaultdict(list)
-
 for c, task in enumerate(data["run.name"]):
+    ts = data["run.timestamp"][c]
     test = data["result.test"][c]
     samples = data["result.samples"][c]
-    if not samples:
+    if not samples or not isinstance(samples, list):
         # Some tests are missing these
         continue
     if len(samples) < 25:
@@ -115,6 +120,7 @@ for c, task in enumerate(data["run.name"]):
             "with_13": np.median(samples[:13]),
             "with_20": np.median(samples[:20]),
             "progressive": _progressive(samples),
+            "ts": ts
         }
     )
 
@@ -125,16 +131,19 @@ def diff(orig, new):
 
 avg = {"8": [], "13": [], "20": [], "prog": []}
 
+print("name,when,25,20,20_diff,13,13_diff,8,8_diff,prog,prog_diff,prog_samples,prog_perms")
 for name, values in res.items():
-    print(name)
+    #print(name)
     for value in values:
-        m = (
-            "\t25 samples: %.2f\n"
-            "\t20 samples: %.2f (%.2f%%)\n"
-            "\t13 samples: %.2f (%.2f%%)\n"
-            "\t8 samples: %.2f (%.2f%%)\n"
-            "\tprogressive %.2f (%.2f%%) (%d samples, %d perms)"
-        )
+        #m = (
+        #    "\twhen %s\n"
+        #    "\t25 samples: %.2f\n"
+        #    "\t20 samples: %.2f (%.2f%%)\n"
+        #    "\t13 samples: %.2f (%.2f%%)\n"
+        #    "\t8 samples: %.2f (%.2f%%)\n"
+        #    "\tprogressive %.2f (%.2f%%) (%d samples, %d perms)"
+        #)
+        m = "%s,%s,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d"
 
         prog, samp, perm = value["progressive"]
         orig = value["original"]
@@ -148,6 +157,7 @@ for name, values in res.items():
         print(
             m
             % (
+                name,value["ts"],
                 orig,
                 with_20,
                 with_20_diff,
@@ -161,13 +171,12 @@ for name, values in res.items():
                 perm,
             )
         )
-        print()
         avg["8"].append(with_8_diff)
         avg["13"].append(with_13_diff)
         avg["20"].append(with_20_diff)
         avg["prog"].append(prog_diff)
 
-print("8 samples average diff %.2f%%" % np.average(avg["8"]))
-print("13 samples average diff %.2f%%" % np.average(avg["13"]))
-print("20 samples average diff %.2f%%" % np.average(avg["20"]))
-print("progressive samples diff %.2f%%" % np.average(avg["prog"]))
+#print("8 samples average diff %.2f%%" % np.average(avg["8"]))
+#print("13 samples average diff %.2f%%" % np.average(avg["13"]))
+#print("20 samples average diff %.2f%%" % np.average(avg["20"]))
+#print("progressive samples diff %.2f%%" % np.average(avg["prog"]))
