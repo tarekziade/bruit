@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import sys
 import json
 import urllib
 import pathlib
@@ -10,18 +11,13 @@ import numpy as np
 from urllib.parse import urlencode
 from urllib.request import urlopen, urlretrieve
 
-"""
-Modify the `find` fields to change the tasks that
-you analyze data from.
+if len(sys.argv) > 1:
+    RUN_NAME = sys.argv[-1]
+else:
+    RUN_NAME = "test-windows7-32/opt-raptor-tp6-8-firefox-e10s"
 
-If you want data from a certain period use:
-    {"gte": {"date": "today-20day"}},
-    {"lt": {"date": "today"}},
-
-"""
 AD_QUERY = {
     "from": "perf",
-    "limit": 1,
     "select": [
         "run.name",
         "run.timestamp",
@@ -29,21 +25,24 @@ AD_QUERY = {
         "result.test",
         "result.samples",
         "result.stats",
+        "result.tags"
     ],
     "where": {
         "and": [
-            {"gte": {"action.start_time": {"date": "today-3month"}}},
+            {"gte": {"action.start_time": {"date": "today-6month"}}},
             {"lt": {"action.start_time": {"date": "today"}}},
             {
                 "or": [
                     {"find": {"run.name": "raptor"}},
-                    {"find": {"run.name": "browsertime"}},
+               #     {"find": {"run.name": "browsertime"}},
                 ]
             },
-            {"or": [{"find": {"run.name": "tp6-"}},
-                    {"find": {"run.name": "tp6m-"}}
+            {"or": [{"find": {"run.name": RUN_NAME}},
                 ]},
             {"eq": {"task.state": "completed"}},
+            {"eq":{"result.test":"loadtime"}},
+            {"eq": {"build.branch": "mozilla-central"}},
+            {"eq":{"result.suite":"raptor-tp6-wikipedia-firefox"}}
         ]
     },
 }
@@ -69,9 +68,7 @@ def query_activedata(query_json):
     jsondataasbytes = jsondata.encode("utf-8")
     req.add_header("Content-Length", len(jsondataasbytes))
 
-    print("Querying Active-data...")
     response = urllib.request.urlopen(req, jsondataasbytes)
-    print("Status:" + str(response.getcode()))
     data = response.read().decode("utf8").replace("'", '"')
     with saved.open("w") as f:
         f.write(data)
@@ -79,7 +76,8 @@ def query_activedata(query_json):
 
 
 # Set the number of data points to look at
-AD_QUERY["limit"] = 10000
+AD_QUERY["limit"] = 100000
+
 data = query_activedata(AD_QUERY)
 failed = 0
 
@@ -118,7 +116,6 @@ for c, task in enumerate(data["run.name"]):
         continue
     if len(samples) < size:
         continue
-
     # removing the first one
     samples = samples[dump:]
     random.shuffle(samples)
@@ -187,13 +184,11 @@ for name, values in res.items():
                 perm,
             )
         m += "," + ",".join([str(v) for v in value["samples"]])
-
+        print(m)
         #avg["8"].append(with_8_diff)
         #avg["13"].append(with_13_diff)
         #avg["20"].append(with_20_diff)
         #avg["prog"].append(prog_diff)
-        if name == "test-macosx1014-64-shippable/opt-raptor-tp6-9-firefox-cold-e10s":
-            print(m)
         occ[name] += 1
 
 #print("8 samples average diff %.2f%%" % np.average(avg["8"]))
